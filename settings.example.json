@@ -1,0 +1,13 @@
+{
+  "repository": "https://repo1.maven.org/maven2",
+  "backupDir": ".mvnp/back",
+  "metadataCacheDir": ".mvnp/cache/metadata",
+  "policy": "latest-releases",
+  "ignore": [
+    "com.fasterxml.jackson:jackson-bom",
+    "tools.jackson:jackson-bom",
+    "software.amazon.awssdk:bom"
+  ],
+  "include": [],
+  "projects": {}
+}
