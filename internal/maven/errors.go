@@ -29,6 +29,8 @@ func ShortSkipReason(reason string) string {
 		return "No matching version"
 	case strings.HasPrefix(reason, "unsupported version"):
 		return "Unsupported version"
+	case strings.HasPrefix(reason, "no explicit version in pom"):
+		return "No version in pom"
 	case strings.HasPrefix(reason, "metadata request failed"):
 		return "Repository error"
 	case strings.HasPrefix(reason, "fetch metadata"):

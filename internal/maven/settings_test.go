@@ -25,6 +25,48 @@ func TestCoordinateFilter(t *testing.T) {
 	}
 }
 
+func TestResolveSettingsBackupKeepCount(t *testing.T) {
+	project := t.TempDir()
+	projectSettings := filepath.Join(project, ProjectSettingsDir, ProjectSettingsName)
+	if err := os.MkdirAll(filepath.Dir(projectSettings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(projectSettings, []byte(`{
+  "backupKeepCount": 5
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := ResolveSettings(project, SettingsOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.BackupKeepCount != 5 {
+		t.Fatalf("backupKeepCount = %d, want 5", resolved.BackupKeepCount)
+	}
+}
+
+func TestResolveSettingsAutoBackup(t *testing.T) {
+	project := t.TempDir()
+	projectSettings := filepath.Join(project, ProjectSettingsDir, ProjectSettingsName)
+	if err := os.MkdirAll(filepath.Dir(projectSettings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(projectSettings, []byte(`{
+  "autoBackup": false
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := ResolveSettings(project, SettingsOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.AutoBackup {
+		t.Fatalf("autoBackup = %v, want false", resolved.AutoBackup)
+	}
+}
+
 func TestResolveSettingsMerge(t *testing.T) {
 	project := t.TempDir()
 	projectSettings := filepath.Join(project, ProjectSettingsDir, ProjectSettingsName)

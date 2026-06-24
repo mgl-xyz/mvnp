@@ -161,7 +161,7 @@ mvnp settings show [目录]
 2. 全局配置：`~/.config/mvnp/settings.json`
 3. 项目配置：`.mvnp/settings.json`
 4. 全局配置里 `projects` 字段按项目路径覆盖
-5. 命令行参数（`-repository`、`-backup-dir`、`-include`、`-ignore` 等）
+5. 命令行参数（`-repository`、`-backup-dir`、`-no-backup`、`-include`、`-ignore` 等）
 
 示例 `.mvnp/settings.json`：
 
@@ -169,6 +169,8 @@ mvnp settings show [目录]
 {
   "repository": "https://repo1.maven.org/maven2",
   "backupDir": ".mvnp/back",
+  "autoBackup": true,
+  "backupKeepCount": 2,
   "metadataCacheDir": ".mvnp/cache/metadata",
   "policy": "latest-releases",
   "ignore": [
@@ -270,7 +272,9 @@ mvnp 会扫描并升级以下区块中的显式版本：
 2. 若有变更，自动创建新备份
 3. 写入升级后的 `pom.xml`
 
-使用 `--no-backup` 可关闭自动备份。
+在配置中设置 `"autoBackup": false`，或使用命令行 `--no-backup` 可关闭自动备份。
+
+默认只保留最近 **2** 个备份版本（`"backupKeepCount": 2`）。创建新备份时会自动删除更早的版本，类似监控循环覆盖录制。设置 `"backupKeepCount": 0` 可保留全部备份。
 
 ## 开发
 

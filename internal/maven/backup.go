@@ -14,6 +14,9 @@ import (
 
 const DefaultBackupDirName = ".mvnp/back"
 
+// DefaultBackupKeepCount is the number of backup versions retained by default.
+const DefaultBackupKeepCount = 2
+
 // BackupManifest describes one versioned pom.xml backup snapshot.
 type BackupManifest struct {
 	Version   int          `json:"version"`
@@ -35,6 +38,7 @@ type BackupRequest struct {
 	Recursive bool
 	BackupDir string
 	Label     string
+	KeepCount int
 }
 
 // BackupReport summarizes a completed backup.
@@ -136,6 +140,10 @@ func Backup(request BackupRequest) (*BackupReport, error) {
 	}
 
 	if err := writeManifest(versionDir, manifest); err != nil {
+		return nil, err
+	}
+
+	if err := pruneOldBackups(backupDir, request.KeepCount); err != nil {
 		return nil, err
 	}
 
@@ -259,6 +267,30 @@ func nextBackupVersion(backupDir string) (int, error) {
 		return 1, nil
 	}
 	return manifests[len(manifests)-1].Version + 1, nil
+}
+
+// pruneOldBackups removes oldest backup versions, keeping only the latest keepCount entries.
+// keepCount <= 0 retains all backups.
+func pruneOldBackups(backupDir string, keepCount int) error {
+	if keepCount <= 0 {
+		return nil
+	}
+
+	manifests, err := ListBackups(backupDir)
+	if err != nil {
+		return err
+	}
+	if len(manifests) <= keepCount {
+		return nil
+	}
+
+	for _, item := range manifests[:len(manifests)-keepCount] {
+		dir := versionDirectory(backupDir, item.Version)
+		if err := os.RemoveAll(dir); err != nil {
+			return fmt.Errorf("remove backup v%d: %w", item.Version, err)
+		}
+	}
+	return nil
 }
 
 func versionDirectory(backupDir string, version int) string {

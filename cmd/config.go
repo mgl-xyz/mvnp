@@ -38,6 +38,8 @@ func backupDirForProject(resolved maven.ResolvedSettings, absTarget, override st
 func printResolvedSettings(resolved maven.ResolvedSettings) {
 	fmt.Printf("repository: %s\n", resolved.Repository)
 	fmt.Printf("backupDir: %s\n", resolved.BackupDir)
+	fmt.Printf("autoBackup: %t\n", resolved.AutoBackup)
+	fmt.Printf("backupKeepCount: %d\n", resolved.BackupKeepCount)
 	fmt.Printf("metadataCacheDir: %s\n", resolved.MetadataCacheDir)
 	fmt.Printf("policy: %s\n", resolved.Policy)
 	if len(resolved.Ignore) > 0 {

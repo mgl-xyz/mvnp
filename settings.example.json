@@ -1,6 +1,8 @@
 {
   "repository": "https://repo1.maven.org/maven2",
   "backupDir": ".mvnp/back",
+  "autoBackup": true,
+  "backupKeepCount": 2,
   "metadataCacheDir": ".mvnp/cache/metadata",
   "policy": "latest-releases",
   "ignore": [

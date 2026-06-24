@@ -61,6 +61,7 @@ func runBackup(args []string) error {
 		Recursive: *recursive,
 		BackupDir: storeDir,
 		Label:     *label,
+		KeepCount: resolved.BackupKeepCount,
 	})
 	if err != nil {
 		return err

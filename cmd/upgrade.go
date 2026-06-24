@@ -118,19 +118,25 @@ func runUpgrade(args []string) error {
 		return err
 	}
 
+	autoBackup := resolved.AutoBackup
+	if changedFlag(fs, "no-backup") {
+		autoBackup = !*noBackup
+	}
+
 	report, err := maven.Upgrade(maven.UpgradeRequest{
-		Root:           target,
-		Recursive:      *recursive,
-		Policy:         policy,
-		Options:        opts,
-		Repository:     repositoryForProject(resolved, absTarget),
-		DryRun:         *dryRun,
-		IncludeParent:  *includeParent,
-		OnlyCoordinate: *only,
-		AutoBackup:     !*noBackup,
-		BackupDir:      backupStore,
-		Progress:       maven.DefaultProgress(*quiet, *verbose),
-		Filter:         filter,
+		Root:            target,
+		Recursive:       *recursive,
+		Policy:          policy,
+		Options:         opts,
+		Repository:      repositoryForProject(resolved, absTarget),
+		DryRun:          *dryRun,
+		IncludeParent:   *includeParent,
+		OnlyCoordinate:  *only,
+		AutoBackup:      autoBackup,
+		BackupDir:       backupStore,
+		BackupKeepCount: resolved.BackupKeepCount,
+		Progress:        maven.DefaultProgress(*quiet, *verbose),
+		Filter:          filter,
 	})
 	if err != nil {
 		return err

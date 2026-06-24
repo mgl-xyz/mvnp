@@ -38,10 +38,12 @@ type POM struct {
 }
 
 var (
-	propertyRefPattern  = regexp.MustCompile(`\$\{([^}]+)\}`)
-	depBlockPattern     = regexp.MustCompile(`(?is)<dependency>(.*?)</dependency>`)
-	pluginBlockPattern  = regexp.MustCompile(`(?is)<plugin>(.*?)</plugin>`)
-	tagPattern          = func(tag string) *regexp.Regexp {
+	propertyRefPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
+	depBlockPattern    = regexp.MustCompile(`(?is)<dependency>(.*?)</dependency>`)
+	pluginBlockPattern = regexp.MustCompile(`(?is)<plugin>(.*?)</plugin>`)
+	pathBlockPattern   = regexp.MustCompile(`(?is)<path>(.*?)</path>`)
+	pluginDepsPattern  = regexp.MustCompile(`(?is)<dependencies>(.*?)</dependencies>`)
+	tagPattern         = func(tag string) *regexp.Regexp {
 		return regexp.MustCompile(fmt.Sprintf(`(?is)<%s>\s*([^<]*?)\s*</%s>`, tag, tag))
 	}
 )
@@ -266,19 +268,75 @@ func parsePluginsFromContent(sectionContent, section string, sectionOffset int) 
 	var deps []Dependency
 	for _, loc := range pluginBlockPattern.FindAllStringSubmatchIndex(sectionContent, -1) {
 		block := sectionContent[loc[2]:loc[3]]
-		dep := parseDependencyBlock(block, section)
-		if dep == nil {
-			continue
-		}
-		dep.Start = sectionOffset + loc[0]
-		dep.End = sectionOffset + loc[1]
-		if versionLoc := tagPattern("version").FindStringSubmatchIndex(block); versionLoc != nil {
-			dep.VersionPos = sectionOffset + loc[2] + versionLoc[2]
+		blockStart := sectionOffset + loc[2]
+		deps = append(deps, parsePluginBlock(block, section, blockStart)...)
+	}
+	return deps
+}
+
+func parsePluginBlock(block, section string, blockStart int) []Dependency {
+	var deps []Dependency
+
+	header := pluginHeader(block)
+	if dep := parseDependencyBlock(header, section); dep != nil {
+		dep.Start = blockStart
+		dep.End = blockStart + len(block)
+		if versionLoc := tagPattern("version").FindStringSubmatchIndex(header); versionLoc != nil {
+			dep.VersionPos = blockStart + versionLoc[2]
 			dep.VersionLen = versionLoc[3] - versionLoc[2]
 		}
 		deps = append(deps, *dep)
 	}
+
+	pathSection := section + ":path"
+	for _, loc := range pathBlockPattern.FindAllStringSubmatchIndex(block, -1) {
+		pathContent := block[loc[2]:loc[3]]
+		dep := parseDependencyBlock(pathContent, pathSection)
+		if dep == nil {
+			continue
+		}
+		pathStart := blockStart + loc[0]
+		dep.Start = pathStart
+		dep.End = blockStart + loc[1]
+		if versionLoc := tagPattern("version").FindStringSubmatchIndex(pathContent); versionLoc != nil {
+			dep.VersionPos = blockStart + loc[2] + versionLoc[2]
+			dep.VersionLen = versionLoc[3] - versionLoc[2]
+		}
+		deps = append(deps, *dep)
+	}
+
+	pluginDepSection := section + ":dependency"
+	if depsLoc := pluginDepsPattern.FindStringSubmatchIndex(block); depsLoc != nil {
+		depsContent := block[depsLoc[2]:depsLoc[3]]
+		depsOffset := blockStart + depsLoc[2]
+		for _, loc := range depBlockPattern.FindAllStringSubmatchIndex(depsContent, -1) {
+			depContent := depsContent[loc[2]:loc[3]]
+			dep := parseDependencyBlock(depContent, pluginDepSection)
+			if dep == nil {
+				continue
+			}
+			depStart := depsOffset + loc[0]
+			dep.Start = depStart
+			dep.End = depsOffset + loc[1]
+			if versionLoc := tagPattern("version").FindStringSubmatchIndex(depContent); versionLoc != nil {
+				dep.VersionPos = depsOffset + loc[2] + versionLoc[2]
+				dep.VersionLen = versionLoc[3] - versionLoc[2]
+			}
+			deps = append(deps, *dep)
+		}
+	}
+
 	return deps
+}
+
+func pluginHeader(block string) string {
+	lower := strings.ToLower(block)
+	for _, tag := range []string{"<configuration", "<dependencies", "<executions"} {
+		if idx := strings.Index(lower, tag); idx >= 0 {
+			return block[:idx]
+		}
+	}
+	return block
 }
 
 func parseDependencyBlock(block, section string) *Dependency {
@@ -303,6 +361,11 @@ func parseDependencyBlock(block, section string) *Dependency {
 		Scope:      strings.TrimSpace(scope),
 		Section:    section,
 	}
+}
+
+// HasExplicitVersion reports whether the dependency has its own <version> tag in the pom.
+func (dep Dependency) HasExplicitVersion() bool {
+	return dep.VersionPos > 0 && strings.TrimSpace(dep.Version) != ""
 }
 
 func extractTag(block, tag string) (string, bool) {
@@ -420,10 +483,13 @@ func (p *POM) Save() error {
 
 func (p *POM) UpgradeableDependencies(includeParent bool, only string) []Dependency {
 	var deps []Dependency
-	if includeParent && p.Parent != nil {
+	if includeParent && p.Parent != nil && p.Parent.HasExplicitVersion() {
 		deps = append(deps, *p.Parent)
 	}
 	for _, dep := range p.Deps {
+		if !dep.HasExplicitVersion() {
+			continue
+		}
 		deps = append(deps, dep)
 	}
 

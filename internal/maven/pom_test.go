@@ -130,6 +130,190 @@ func TestApplyPropertyVersion(t *testing.T) {
 	}
 }
 
+func TestUpgradeableDependenciesRequireVersion(t *testing.T) {
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <parent>
+    <groupId>com.example</groupId>
+    <artifactId>parent</artifactId>
+  </parent>
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.12.0</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pom.xml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pom, err := ParsePOM(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pom.Parent != nil {
+		t.Fatal("parent without version should not be parsed")
+	}
+
+	deps := pom.UpgradeableDependencies(true, "")
+	if len(deps) != 1 {
+		t.Fatalf("expected 1 upgradeable dependency, got %d: %+v", len(deps), deps)
+	}
+	if deps[0].ArtifactID != "commons-lang3" {
+		t.Fatalf("unexpected upgradeable artifact: %+v", deps[0])
+	}
+}
+
+func TestParsePluginAnnotationProcessorPath(t *testing.T) {
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <properties>
+    <therapi-javadoc.version>0.15.0</therapi-javadoc.version>
+    <java.version>17</java.version>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.github.therapi</groupId>
+              <artifactId>therapi-runtime-javadoc-scribe</artifactId>
+              <version>${therapi-javadoc.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pom.xml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pom, err := ParsePOM(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var compilerPlugin, therapiPath *Dependency
+	for i := range pom.Deps {
+		switch pom.Deps[i].ArtifactID {
+		case "maven-compiler-plugin":
+			compilerPlugin = &pom.Deps[i]
+		case "therapi-runtime-javadoc-scribe":
+			therapiPath = &pom.Deps[i]
+		}
+	}
+	if compilerPlugin != nil {
+		t.Fatalf("unexpected compiler plugin entry: %+v", *compilerPlugin)
+	}
+	if therapiPath == nil {
+		t.Fatal("therapi annotation processor path not found")
+	}
+	if therapiPath.GroupID != "com.github.therapi" {
+		t.Fatalf("groupId = %q", therapiPath.GroupID)
+	}
+	if therapiPath.Version != "${therapi-javadoc.version}" {
+		t.Fatalf("version = %q", therapiPath.Version)
+	}
+	if therapiPath.Section != "plugins:path" {
+		t.Fatalf("section = %q", therapiPath.Section)
+	}
+}
+
+func TestUpgradeAnnotationProcessorPathProperty(t *testing.T) {
+	content := `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <properties>
+    <therapi-javadoc.version>0.14.0</therapi-javadoc.version>
+  </properties>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.github.therapi</groupId>
+              <artifactId>therapi-runtime-javadoc-scribe</artifactId>
+              <version>${therapi-javadoc.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "pom.xml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := &stubRepository{versions: map[string][]string{
+		"com.github.therapi:therapi-runtime-javadoc-scribe": {"0.14.0", "0.15.0"},
+		"org.apache.maven.plugins:maven-compiler-plugin":    {"3.13.0", "3.15.0"},
+	}}
+
+	report, err := Upgrade(UpgradeRequest{
+		Root:       dir,
+		Policy:     PolicyLatestReleases,
+		Repository: repo,
+		AutoBackup: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, result := range report.Results {
+		if result.ArtifactID == "maven-compiler-plugin" && !result.Skipped {
+			t.Fatalf("unexpected compiler plugin upgrade: %+v", result)
+		}
+	}
+
+	var therapiResult *UpgradeResult
+	for i := range report.Results {
+		if report.Results[i].ArtifactID == "therapi-runtime-javadoc-scribe" {
+			therapiResult = &report.Results[i]
+			break
+		}
+	}
+	if therapiResult == nil {
+		t.Fatal("therapi upgrade result not found")
+	}
+	if therapiResult.Skipped {
+		t.Fatalf("therapi unexpectedly skipped: %s", therapiResult.Reason)
+	}
+	if therapiResult.NewVersion != "0.15.0" {
+		t.Fatalf("therapi new version = %q, want 0.15.0", therapiResult.NewVersion)
+	}
+}
+
 func TestWritablePropertyChain(t *testing.T) {
 	content := `<project><properties>
     <jackson.version>${jackson-bom.version}</jackson.version>

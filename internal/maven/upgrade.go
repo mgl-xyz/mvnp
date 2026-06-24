@@ -8,32 +8,33 @@ import (
 )
 
 type UpgradeRequest struct {
-	Root           string
-	Recursive      bool
-	Policy         Policy
-	Options        PolicyOptions
-	Repository     VersionLister
-	DryRun         bool
-	IncludeParent  bool
-	OnlyCoordinate string
-	AutoBackup     bool
-	BackupDir      string
-	BackupLabel    string
-	Progress       Progress
-	Filter         CoordinateFilter
+	Root            string
+	Recursive       bool
+	Policy          Policy
+	Options         PolicyOptions
+	Repository      VersionLister
+	DryRun          bool
+	IncludeParent   bool
+	OnlyCoordinate  string
+	AutoBackup      bool
+	BackupDir       string
+	BackupKeepCount int
+	BackupLabel     string
+	Progress        Progress
+	Filter          CoordinateFilter
 }
 
 type UpgradeResult struct {
-	POMPath        string
-	GroupID        string
-	ArtifactID     string
-	OldVersion     string
-	NewVersion     string
-	Section        string
-	PropertyRef    string
-	ResolvedOld    string
-	Skipped        bool
-	Reason         string
+	POMPath     string
+	GroupID     string
+	ArtifactID  string
+	OldVersion  string
+	NewVersion  string
+	Section     string
+	PropertyRef string
+	ResolvedOld string
+	Skipped     bool
+	Reason      string
 }
 
 type UpgradeReport struct {
@@ -159,6 +160,7 @@ func Upgrade(request UpgradeRequest) (*UpgradeReport, error) {
 			Recursive: request.Recursive,
 			BackupDir: request.BackupDir,
 			Label:     label,
+			KeepCount: request.BackupKeepCount,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("auto backup before upgrade: %w", err)
@@ -248,6 +250,12 @@ func evaluateDependencyUpgrade(
 		ArtifactID: dep.ArtifactID,
 		OldVersion: dep.Version,
 		Section:    dep.Section,
+	}
+
+	if !dep.HasExplicitVersion() {
+		result.Skipped = true
+		result.Reason = "no explicit version in pom"
+		return result, nil
 	}
 
 	propertyRef, viaProperty := ExtractPropertyRef(dep.Version)

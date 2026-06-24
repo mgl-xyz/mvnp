@@ -1,10 +1,78 @@
 package maven
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestBackupRetention(t *testing.T) {
+	root := t.TempDir()
+	backupStore := filepath.Join(root, "backups")
+	pomPath := filepath.Join(root, "pom.xml")
+
+	for version := 1; version <= 3; version++ {
+		if err := os.WriteFile(pomPath, []byte(fmt.Sprintf(`<project><artifactId>demo</artifactId><version>%d.0.0</version></project>`, version)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		report, err := Backup(BackupRequest{
+			Root:      root,
+			BackupDir: backupStore,
+			KeepCount: 2,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if report.Manifest.Version != version {
+			t.Fatalf("backup %d: got version v%d", version, report.Manifest.Version)
+		}
+	}
+
+	manifests, err := ListBackups(backupStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifests) != 2 {
+		t.Fatalf("expected 2 retained backups, got %d", len(manifests))
+	}
+	if manifests[0].Version != 2 || manifests[1].Version != 3 {
+		t.Fatalf("expected versions [2 3], got [%d %d]", manifests[0].Version, manifests[1].Version)
+	}
+
+	restored, err := Restore(RestoreRequest{Root: root, BackupDir: backupStore, Version: 1})
+	if err == nil {
+		t.Fatalf("expected restore v1 to fail, got %+v", restored)
+	}
+
+	latest, err := Restore(RestoreRequest{Root: root, BackupDir: backupStore, Version: 0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Manifest.Version != 3 {
+		t.Fatalf("expected latest v3, got v%d", latest.Manifest.Version)
+	}
+
+	data, err := os.ReadFile(pomPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `<project><artifactId>demo</artifactId><version>3.0.0</version></project>` {
+		t.Fatalf("unexpected restored content: %q", string(data))
+	}
+
+	_, err = Restore(RestoreRequest{Root: root, BackupDir: backupStore, Version: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(pomPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != `<project><artifactId>demo</artifactId><version>2.0.0</version></project>` {
+		t.Fatalf("restore v2 failed, got %q", string(data))
+	}
+}
 
 func TestBackupAndRestore(t *testing.T) {
 	root := t.TempDir()
@@ -30,6 +98,7 @@ func TestBackupAndRestore(t *testing.T) {
 		Recursive: true,
 		BackupDir: backupStore,
 		Label:     "initial",
+		KeepCount: 0,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +114,7 @@ func TestBackupAndRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second, err := Backup(BackupRequest{Root: root, BackupDir: backupStore})
+	second, err := Backup(BackupRequest{Root: root, BackupDir: backupStore, KeepCount: 0})
 	if err != nil {
 		t.Fatal(err)
 	}

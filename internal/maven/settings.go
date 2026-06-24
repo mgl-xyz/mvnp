@@ -10,27 +10,31 @@ import (
 )
 
 const (
-	GlobalSettingsDir  = ".config/mvnp"
-	GlobalSettingsName = "settings.json"
-	ProjectSettingsDir = ".mvnp"
+	GlobalSettingsDir   = ".config/mvnp"
+	GlobalSettingsName  = "settings.json"
+	ProjectSettingsDir  = ".mvnp"
 	ProjectSettingsName = "settings.json"
 )
 
 // Settings stores shared mvnp configuration.
 type Settings struct {
-	Repository       string                       `json:"repository,omitempty"`
-	BackupDir        string                       `json:"backupDir,omitempty"`
-	MetadataCacheDir string                       `json:"metadataCacheDir,omitempty"`
-	Policy           string                       `json:"policy,omitempty"`
-	Ignore           []string                     `json:"ignore,omitempty"`
-	Include          []string                     `json:"include,omitempty"`
-	Projects         map[string]ProjectSettings   `json:"projects,omitempty"`
+	Repository       string                     `json:"repository,omitempty"`
+	BackupDir        string                     `json:"backupDir,omitempty"`
+	AutoBackup       *bool                      `json:"autoBackup,omitempty"`
+	BackupKeepCount  *int                       `json:"backupKeepCount,omitempty"`
+	MetadataCacheDir string                     `json:"metadataCacheDir,omitempty"`
+	Policy           string                     `json:"policy,omitempty"`
+	Ignore           []string                   `json:"ignore,omitempty"`
+	Include          []string                   `json:"include,omitempty"`
+	Projects         map[string]ProjectSettings `json:"projects,omitempty"`
 }
 
 // ProjectSettings overrides settings for a specific project path.
 type ProjectSettings struct {
 	Repository       string   `json:"repository,omitempty"`
 	BackupDir        string   `json:"backupDir,omitempty"`
+	AutoBackup       *bool    `json:"autoBackup,omitempty"`
+	BackupKeepCount  *int     `json:"backupKeepCount,omitempty"`
 	MetadataCacheDir string   `json:"metadataCacheDir,omitempty"`
 	Policy           string   `json:"policy,omitempty"`
 	Ignore           []string `json:"ignore,omitempty"`
@@ -41,6 +45,8 @@ type ProjectSettings struct {
 type ResolvedSettings struct {
 	Repository       string
 	BackupDir        string
+	AutoBackup       bool
+	BackupKeepCount  int
 	MetadataCacheDir string
 	Policy           string
 	Include          []string
@@ -59,9 +65,13 @@ type SettingsOverrides struct {
 }
 
 func DefaultSettings() Settings {
+	autoBackup := true
+	keepCount := DefaultBackupKeepCount
 	return Settings{
 		Repository:       defaultRepository,
 		BackupDir:        DefaultBackupDirName,
+		AutoBackup:       &autoBackup,
+		BackupKeepCount:  &keepCount,
 		MetadataCacheDir: metadataCacheDir,
 		Policy:           string(PolicyLatestReleases),
 	}
@@ -112,9 +122,19 @@ func SaveSettingsFile(path string, settings Settings) error {
 
 func ResolveSettings(projectRoot string, overrides SettingsOverrides) (ResolvedSettings, error) {
 	defaults := DefaultSettings()
+	autoBackup := true
+	if defaults.AutoBackup != nil {
+		autoBackup = *defaults.AutoBackup
+	}
+	backupKeepCount := DefaultBackupKeepCount
+	if defaults.BackupKeepCount != nil {
+		backupKeepCount = *defaults.BackupKeepCount
+	}
 	resolved := ResolvedSettings{
 		Repository:       defaults.Repository,
 		BackupDir:        defaults.BackupDir,
+		AutoBackup:       autoBackup,
+		BackupKeepCount:  backupKeepCount,
 		MetadataCacheDir: defaults.MetadataCacheDir,
 		Policy:           defaults.Policy,
 	}
@@ -162,6 +182,12 @@ func applySettings(resolved *ResolvedSettings, settings Settings, project bool) 
 	if settings.BackupDir != "" {
 		resolved.BackupDir = settings.BackupDir
 	}
+	if settings.AutoBackup != nil {
+		resolved.AutoBackup = *settings.AutoBackup
+	}
+	if settings.BackupKeepCount != nil {
+		resolved.BackupKeepCount = *settings.BackupKeepCount
+	}
 	if settings.MetadataCacheDir != "" {
 		resolved.MetadataCacheDir = settings.MetadataCacheDir
 	}
@@ -181,6 +207,8 @@ func applyProjectSettings(resolved *ResolvedSettings, settings ProjectSettings) 
 	applySettings(resolved, Settings{
 		Repository:       settings.Repository,
 		BackupDir:        settings.BackupDir,
+		AutoBackup:       settings.AutoBackup,
+		BackupKeepCount:  settings.BackupKeepCount,
 		MetadataCacheDir: settings.MetadataCacheDir,
 		Policy:           settings.Policy,
 		Ignore:           settings.Ignore,

@@ -161,7 +161,7 @@ Settings are loaded in this order:
 2. Global settings: `~/.config/mvnp/settings.json`
 3. Project settings: `.mvnp/settings.json`
 4. Per-project overrides in global `projects` map
-5. CLI flags (`-repository`, `-backup-dir`, `-include`, `-ignore`, ...)
+5. CLI flags (`-repository`, `-backup-dir`, `-no-backup`, `-include`, `-ignore`, ...)
 
 Example `.mvnp/settings.json`:
 
@@ -169,6 +169,8 @@ Example `.mvnp/settings.json`:
 {
   "repository": "https://repo1.maven.org/maven2",
   "backupDir": ".mvnp/back",
+  "autoBackup": true,
+  "backupKeepCount": 2,
   "metadataCacheDir": ".mvnp/cache/metadata",
   "policy": "latest-releases",
   "ignore": [
@@ -270,7 +272,9 @@ When running `mvnp upgrade` (without `--dry-run`):
 2. If changes are needed, it automatically creates a new backup
 3. Then it writes the upgraded `pom.xml` files
 
-Use `--no-backup` to disable this behavior.
+Use `"autoBackup": false` in settings or `--no-backup` on the command line to disable this behavior.
+
+By default, only the latest **2** backup versions are kept (`"backupKeepCount": 2`). When a new backup is created, older versions are removed automatically. Set `"backupKeepCount": 0` to retain all backups.
 
 ## Development
 
