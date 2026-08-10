@@ -1,8 +1,28 @@
-# mvnp
+# mvnp / nvnp
 
-Enhanced Maven tooling written in Go. **mvnp** helps you safely upgrade dependency versions in `pom.xml` files, with versioned backups and restore support.
+This repository provides two Go dependency upgrade tools:
+
+- **mvnp** — safely upgrade Maven `pom.xml` dependencies with versioned backup/restore
+- **nvnp** — safely upgrade npm `package.json` dependencies (aligned with [npm-check-updates](https://github.com/raineorshine/npm-check-updates)), with the same UX as mvnp
 
 [中文文档](README_zh.md)
+
+## Installation
+
+Requires Go 1.21+.
+
+```bash
+git clone <repository-url>
+cd mvnp
+go build -o mvnp .
+go build -o nvnp ./nvnp
+```
+
+---
+
+# mvnp
+
+Enhanced Maven tooling.
 
 ## Features
 
@@ -13,23 +33,13 @@ Enhanced Maven tooling written in Go. **mvnp** helps you safely upgrade dependen
 - Policies aligned with [Maven Versions Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/)
 - Query versions from Maven Central (custom repository URL supported)
 
-## Installation
-
-Requires Go 1.21+.
-
-```bash
-git clone <repository-url>
-cd mvnp
-go build -o mvnp .
-```
-
-Optionally install into your `PATH`:
+## mvnp install
 
 ```bash
 go install .
 ```
 
-## Quick Start
+## mvnp Quick Start
 
 ```bash
 # Preview upgrades in the current project
@@ -276,11 +286,60 @@ Use `"autoBackup": false` in settings or `--no-backup` on the command line to di
 
 By default, only the latest **2** backup versions are kept (`"backupKeepCount": 2`). When a new backup is created, older versions are removed automatically. Set `"backupKeepCount": 0` to retain all backups.
 
+---
+
+# nvnp
+
+npm `package.json` upgrade tool with mvnp-aligned CLI. Core behavior is similar to npm-check-updates.
+
+## Features
+
+- **Upgrade** `dependencies` and `devDependencies` only by default (other fields untouched)
+- **Preserves the original file** — only version strings are replaced, no full-file rewrite
+- **Preserve semver range style** (e.g. `^1.2.0` → `^2.0.0`)
+- **Backup / restore** `package.json` files (default `.nvnp/back`)
+- **Auto-backup** before upgrade (enabled by default)
+- Query versions from npm registry (custom registry URL supported)
+- Targets: `latest` (default), `greatest`, `minor`, `patch`, `semver`
+
+## nvnp Quick Start
+
+```bash
+nvnp upgrade --dry-run
+nvnp upgrade
+nvnp backup
+nvnp restore
+nvnp list --numbered
+```
+
+## nvnp upgrade options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-target` | `latest` | Upgrade target |
+| `-recursive` | `false` | Process child `package.json` files |
+| `-dry-run` | `false` | Preview only |
+| `-no-backup` | `false` | Skip auto-backup |
+| `-include` / `-ignore` | | Allow/deny lists (supports `react-*`, `@types/*`) |
+| `-select` / `-ignore-select` | | Interactive selection |
+| `-dep` | `dependencies,devDependencies` | e.g. `peer,optional` to include more |
+| `-registry` | npmjs.org | Custom registry |
+
+## nvnp settings
+
+Project: `.nvnp/settings.json`  
+Global: `~/.config/nvnp/settings.json`
+
+See [settings.example-nvnp.json](settings.example-nvnp.json).
+
+After upgrading, run `npm install` (or pnpm/yarn) to refresh lock files and `node_modules`.
+
 ## Development
 
 ```bash
 go test ./...
 go build -o mvnp .
+go build -o nvnp ./nvnp
 ```
 
 ## Roadmap

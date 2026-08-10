@@ -1,8 +1,28 @@
-# mvnp
+# mvnp / nvnp
 
-用 Go 编写的 Maven 增强工具。**mvnp** 可安全地升级 `pom.xml` 中的依赖版本，并支持版本化备份与恢复。
+本仓库包含两个 Go 依赖升级工具：
+
+- **mvnp** — 安全升级 Maven `pom.xml` 依赖，支持版本化备份与恢复
+- **nvnp** — 安全升级 npm `package.json` 依赖（功能对齐 [npm-check-updates](https://github.com/raineorshine/npm-check-updates)），体验对齐 mvnp
 
 [English](README.md)
+
+## 安装
+
+需要 Go 1.21 及以上版本。
+
+```bash
+git clone <repository-url>
+cd mvnp
+go build -o mvnp .
+go build -o nvnp ./nvnp
+```
+
+---
+
+# mvnp
+
+Maven 增强工具。
 
 ## 功能特性
 
@@ -13,23 +33,13 @@
 - 升级策略与 [Maven Versions Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/) 对齐
 - 从 Maven Central 查询版本（支持自定义仓库地址）
 
-## 安装
-
-需要 Go 1.21 及以上版本。
-
-```bash
-git clone <repository-url>
-cd mvnp
-go build -o mvnp .
-```
-
-也可安装到 `PATH`：
+## mvnp 安装
 
 ```bash
 go install .
 ```
 
-## 快速开始
+## mvnp 快速开始
 
 ```bash
 # 预览当前项目的可升级项
@@ -276,11 +286,72 @@ mvnp 会扫描并升级以下区块中的显式版本：
 
 默认只保留最近 **2** 个备份版本（`"backupKeepCount": 2`）。创建新备份时会自动删除更早的版本，类似监控循环覆盖录制。设置 `"backupKeepCount": 0` 可保留全部备份。
 
+---
+
+# nvnp
+
+npm `package.json` 依赖升级工具，CLI 与 mvnp 对齐，核心能力与 npm-check-updates 类似。
+
+## 功能特性
+
+- **升级** `package.json` 中 `dependencies` 与 `devDependencies`（默认仅这两类，不改动其他字段）
+- **保留原文件**：只替换版本字符串，不整文件重写
+- **保留 semver 写法**（如 `^1.2.0` → `^2.0.0`）
+- **备份 / 恢复** `package.json`（默认 `.nvnp/back`）
+- **自动备份**：升级前默认自动备份
+- 从 npm registry 查询版本（支持私服地址）
+- 升级目标：`latest`（默认）、`greatest`、`minor`、`patch`、`semver`
+
+## nvnp 快速开始
+
+```bash
+# 预览
+nvnp upgrade --dry-run
+
+# 升级（默认自动备份）
+nvnp upgrade
+
+# 备份 / 恢复
+nvnp backup
+nvnp restore
+
+# 列出可升级包
+nvnp list --numbered
+```
+
+## nvnp upgrade 常用选项
+
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `-target` | `latest` | 升级目标（latest/greatest/minor/patch/semver） |
+| `-recursive` | `false` | 递归处理子目录 package.json |
+| `-dry-run` | `false` | 仅预览 |
+| `-no-backup` | `false` | 跳过自动备份 |
+| `-include` / `-ignore` | | 白名单 / 黑名单（支持 `react-*`、`@types/*`） |
+| `-select` / `-ignore-select` | | 交互式选择 |
+| `-dep` | `dependencies,devDependencies` | 如 `peer,optional` 可额外开启 |
+| `-registry` | npmjs.org | 自定义 registry |
+
+## nvnp 配置
+
+项目配置：`.nvnp/settings.json`  
+全局配置：`~/.config/nvnp/settings.json`
+
+```bash
+nvnp settings init
+nvnp settings show
+```
+
+参考 [settings.example-nvnp.json](settings.example-nvnp.json)。
+
+升级完成后请运行 `npm install`（或 pnpm/yarn）更新 lock 文件与 node_modules。
+
 ## 开发
 
 ```bash
 go test ./...
 go build -o mvnp .
+go build -o nvnp ./nvnp
 ```
 
 ## 路线图
