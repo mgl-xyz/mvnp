@@ -63,15 +63,15 @@ func TestUpgradePropertyReferencedVersion(t *testing.T) {
 	}
 
 	repo := &stubRepository{versions: map[string][]string{
-		"com.fasterxml.jackson:jackson-bom":        {"2.15.2", "2.16.0", "2.17.0"},
+		"com.fasterxml.jackson:jackson-bom":              {"2.15.2", "2.16.0", "2.17.0"},
 		"org.apache.maven.plugins:maven-compiler-plugin": {"3.8.1", "3.11.0", "3.12.1"},
 	}}
 
 	report, err := Upgrade(UpgradeRequest{
-		Root:         dir,
-		Policy:       PolicyLatestReleases,
-		Repository:   repo,
-		AutoBackup:   false,
+		Root:       dir,
+		Policy:     PolicyLatestReleases,
+		Repository: repo,
+		AutoBackup: false,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -152,6 +152,74 @@ func TestUpgradeSharedPropertyReportsAllDependents(t *testing.T) {
 	}
 	if countSubstring(string(updated), "2.17.0") != 1 {
 		t.Fatalf("property value should be written once: %s", updated)
+	}
+}
+
+func TestUpgradeFastjson2PropertyIgnoresAndroidSuffix(t *testing.T) {
+	dir := t.TempDir()
+	pomContent := `<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <properties>
+    <fastjson2.version>2.0.64</fastjson2.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>com.alibaba.fastjson2</groupId>
+      <artifactId>fastjson2</artifactId>
+      <version>${fastjson2.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.alibaba.fastjson2</groupId>
+      <artifactId>fastjson2-extension</artifactId>
+      <version>${fastjson2.version}</version>
+    </dependency>
+  </dependencies>
+</project>`
+	path := filepath.Join(dir, "pom.xml")
+	if err := os.WriteFile(path, []byte(pomContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := &stubRepository{versions: map[string][]string{
+		"com.alibaba.fastjson2:fastjson2": {
+			"2.0.63",
+			"2.0.64",
+			"2.0.64.android5",
+			"2.0.64.android8",
+		},
+		"com.alibaba.fastjson2:fastjson2-extension": {
+			"2.0.63",
+			"2.0.64",
+		},
+	}}
+
+	report, err := Upgrade(UpgradeRequest{
+		Root:       dir,
+		Policy:     PolicyLatestReleases,
+		Repository: repo,
+		AutoBackup: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range report.Results {
+		if !result.Skipped {
+			t.Fatalf("expected no upgrade, got %s %s -> %s", result.ArtifactID, result.ResolvedOld, result.NewVersion)
+		}
+		if result.NewVersion == "2.0.64.android8" {
+			t.Fatalf("platform suffix must not be selected: %+v", result)
+		}
+	}
+
+	updated, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(string(updated), "<fastjson2.version>2.0.64</fastjson2.version>") {
+		t.Fatalf("fastjson2.version should stay 2.0.64: %s", updated)
+	}
+	if contains(string(updated), "android8") {
+		t.Fatalf("pom must not contain android8: %s", updated)
 	}
 }
 

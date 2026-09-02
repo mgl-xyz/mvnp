@@ -6,9 +6,12 @@ import (
 )
 
 var (
-	snapshotSuffix = regexp.MustCompile(`(?i)-SNAPSHOT$`)
-	preRelease     = regexp.MustCompile(`(?i)[.-](alpha|beta|rc|cr|m|ea|preview|dev)([.-]?\d*)?$`)
-	calendarVer    = regexp.MustCompile(`\d{4}\.\d{2}\.\d{2}`)
+	snapshotSuffix     = regexp.MustCompile(`(?i)-SNAPSHOT$`)
+	preRelease         = regexp.MustCompile(`(?i)[.-](alpha|beta|rc|cr|m|ea|preview|dev)([.-]?\d*)?$`)
+	calendarVer        = regexp.MustCompile(`\d{4}\.\d{2}\.\d{2}`)
+	timestampQualifier = regexp.MustCompile(`(?i)^v\d{8}`)
+	releaseQualifierSP = regexp.MustCompile(`(?i)^sp\d*$`)
+	coreAndQualifier   = regexp.MustCompile(`(?i)^(\d+(?:[._-]\d+)*)(?:[._-](.+))?$`)
 )
 
 // VersionKind classifies a Maven version string.
@@ -46,6 +49,49 @@ func IsSnapshot(version string) bool {
 func IsRelease(version string) bool {
 	k := ClassifyVersion(version)
 	return k == VersionRelease || k == VersionCalendar
+}
+
+// VersionFamily returns the platform/variant qualifier of a Maven version.
+// Canonical releases like 2.0.64 and 4.1.108.Final have an empty family.
+// Device/runtime forks keep their suffix: 2.0.64.android8 → "android8", 32.1.3-jre → "jre".
+func VersionFamily(version string) string {
+	v := snapshotSuffix.ReplaceAllString(strings.TrimSpace(version), "")
+	v = preRelease.ReplaceAllString(v, "")
+	m := coreAndQualifier.FindStringSubmatch(v)
+	if len(m) < 3 || m[2] == "" {
+		return ""
+	}
+	first := strings.ToLower(qualifierHead(m[2]))
+	if first == "" || isCanonicalQualifier(first) {
+		return ""
+	}
+	return first
+}
+
+func qualifierHead(qual string) string {
+	qual = strings.TrimSpace(qual)
+	for i, r := range qual {
+		if r == '.' || r == '-' || r == '_' {
+			return qual[:i]
+		}
+	}
+	return qual
+}
+
+func isGAEquivalent(s string) bool {
+	switch s {
+	case "final", "ga", "release":
+		return true
+	}
+	return false
+}
+
+func isPostReleaseQualifier(s string) bool {
+	return releaseQualifierSP.MatchString(s)
+}
+
+func isCanonicalQualifier(s string) bool {
+	return isGAEquivalent(s) || isPostReleaseQualifier(s) || timestampQualifier.MatchString(s)
 }
 
 // CompareVersions compares two Maven versions.
@@ -125,10 +171,10 @@ func compareTokens(a, b []interface{}) int {
 	}
 	for i := 0; i < max; i++ {
 		if i >= len(a) {
-			return -1
+			return -cmpExtra(b[i:])
 		}
 		if i >= len(b) {
-			return 1
+			return cmpExtra(a[i:])
 		}
 		switch av := a[i].(type) {
 		case int:
@@ -151,6 +197,31 @@ func compareTokens(a, b []interface{}) int {
 			if c := strings.Compare(as, bs); c != 0 {
 				return c
 			}
+		}
+	}
+	return 0
+}
+
+// cmpExtra ranks leftover tokens after a shared numeric prefix.
+// Extra numbers (1.0.1) and service packs (1.0-sp1) make a version newer.
+// Unknown qualifiers (2.0.64.android8) and pre-releases are older than the prefix.
+func cmpExtra(tokens []interface{}) int {
+	for _, tok := range tokens {
+		switch v := tok.(type) {
+		case int:
+			if v == 0 {
+				continue
+			}
+			return 1
+		case string:
+			lower := strings.ToLower(v)
+			if isPostReleaseQualifier(lower) {
+				return 1
+			}
+			if isGAEquivalent(lower) || timestampQualifier.MatchString(lower) {
+				continue
+			}
+			return -1
 		}
 	}
 	return 0

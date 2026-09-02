@@ -39,6 +39,7 @@ type POM struct {
 
 var (
 	propertyRefPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
+	xmlCommentPattern  = regexp.MustCompile(`(?s)<!--.*?-->`)
 	depBlockPattern    = regexp.MustCompile(`(?is)<dependency>(.*?)</dependency>`)
 	pluginBlockPattern = regexp.MustCompile(`(?is)<plugin>(.*?)</plugin>`)
 	pathBlockPattern   = regexp.MustCompile(`(?is)<path>(.*?)</path>`)
@@ -133,10 +134,14 @@ func parseProperties(content string) ([]PropertyEntry, map[string]string) {
 
 	sectionContent := content[match[2]:match[3]]
 	sectionOffset := match[2]
+	commentSpans := xmlCommentSpans(sectionContent)
 	keyPattern := regexp.MustCompile(`(?is)<([a-zA-Z0-9_.-]+)>\s*([^<]*?)\s*</[a-zA-Z0-9_.-]+>`)
 
 	var entries []PropertyEntry
 	for _, loc := range keyPattern.FindAllStringSubmatchIndex(sectionContent, -1) {
+		if spanInsideExcluded(loc[0], loc[1], commentSpans) {
+			continue
+		}
 		key := strings.TrimSpace(sectionContent[loc[2]:loc[3]])
 		value := strings.TrimSpace(sectionContent[loc[4]:loc[5]])
 		entry := PropertyEntry{
@@ -149,6 +154,14 @@ func parseProperties(content string) ([]PropertyEntry, map[string]string) {
 		props[key] = value
 	}
 	return entries, props
+}
+
+func xmlCommentSpans(content string) [][2]int {
+	var spans [][2]int
+	for _, loc := range xmlCommentPattern.FindAllStringIndex(content, -1) {
+		spans = append(spans, [2]int{loc[0], loc[1]})
+	}
+	return spans
 }
 
 func parseSectionDependencies(content, section string) []Dependency {
@@ -415,12 +428,26 @@ func ExtractPropertyRef(version string) (string, bool) {
 }
 
 func (p *POM) PropertyByKey(key string) (PropertyEntry, bool) {
+	// Maven last-definition-wins; return the last live entry for this key.
+	var found PropertyEntry
+	ok := false
 	for _, entry := range p.PropertyList {
 		if entry.Key == key {
-			return entry, true
+			found = entry
+			ok = true
 		}
 	}
-	return PropertyEntry{}, false
+	return found, ok
+}
+
+func (p *POM) PropertiesByKey(key string) []PropertyEntry {
+	var entries []PropertyEntry
+	for _, entry := range p.PropertyList {
+		if entry.Key == key {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
 }
 
 // WritableProperty follows property reference chains and returns the entry whose value should be updated.
@@ -470,10 +497,18 @@ func (p *POM) ApplyVersion(dep Dependency, newVersion string) {
 }
 
 func (p *POM) ApplyPropertyVersion(entry PropertyEntry, newVersion string) {
-	if entry.ValuePos <= 0 || entry.ValueLen <= 0 {
-		return
+	targets := p.PropertiesByKey(entry.Key)
+	if len(targets) == 0 {
+		targets = []PropertyEntry{entry}
 	}
-	p.Content = p.Content[:entry.ValuePos] + newVersion + p.Content[entry.ValuePos+entry.ValueLen:]
+	// Apply from the end so earlier ValuePos stays valid when lengths change.
+	for i := len(targets) - 1; i >= 0; i-- {
+		e := targets[i]
+		if e.ValuePos <= 0 || e.ValueLen <= 0 {
+			continue
+		}
+		p.Content = p.Content[:e.ValuePos] + newVersion + p.Content[e.ValuePos+e.ValueLen:]
+	}
 	p.Properties[entry.Key] = newVersion
 }
 

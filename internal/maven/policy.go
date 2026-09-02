@@ -75,6 +75,7 @@ func SelectVersion(current string, available []string, policy Policy, opts Polic
 	}
 
 	candidates := filterCandidates(available, opts)
+	candidates = filterSameFamily(current, candidates)
 	if len(candidates) == 0 {
 		return "", false
 	}
@@ -134,6 +135,17 @@ func SelectVersion(current string, available []string, policy Policy, opts Polic
 func shouldModifyForReleasePolicy(current string) bool {
 	k := ClassifyVersion(current)
 	return k == VersionRelease || k == VersionCalendar || k == VersionPreRelease
+}
+
+func filterSameFamily(current string, versions []string) []string {
+	family := VersionFamily(current)
+	var out []string
+	for _, v := range versions {
+		if VersionFamily(v) == family {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func filterCandidates(versions []string, opts PolicyOptions) []string {

@@ -3,6 +3,7 @@ package maven
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -127,6 +128,62 @@ func TestApplyPropertyVersion(t *testing.T) {
 	}
 	if contains(string(updated), "<version>5.10.2</version>") {
 		t.Fatalf("property upgrade should not rewrite dependency version tag: %s", updated)
+	}
+}
+
+func TestParsePropertiesSkipsComments(t *testing.T) {
+	content := `<project><properties>
+        <!--<lombok.version>1.18.30</lombok.version>-->
+        <lombok.version>1.18.42</lombok.version>
+  </properties></project>`
+	entries, props := parseProperties(content)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 live property, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].Key != "lombok.version" || entries[0].Value != "1.18.42" {
+		t.Fatalf("unexpected entry: %+v", entries[0])
+	}
+	if props["lombok.version"] != "1.18.42" {
+		t.Fatalf("props[lombok.version] = %q", props["lombok.version"])
+	}
+}
+
+func TestApplyPropertyVersionUpdatesAllDuplicates(t *testing.T) {
+	content := `<project><properties>
+        <!--<lombok.version>1.18.30</lombok.version>-->
+        <lombok.version>1.18.42</lombok.version>
+        <lombok.version>1.18.42</lombok.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>${lombok.version}</version>
+    </dependency>
+  </dependencies>
+</project>`
+	pom := &POM{Content: content}
+	pom.PropertyList, pom.Properties = parseProperties(content)
+
+	entry, ok := pom.PropertyByKey("lombok.version")
+	if !ok {
+		t.Fatal("lombok.version not found")
+	}
+	if len(pom.PropertiesByKey("lombok.version")) != 2 {
+		t.Fatalf("expected 2 live lombok.version entries, got %d", len(pom.PropertiesByKey("lombok.version")))
+	}
+
+	pom.ApplyPropertyVersion(entry, "1.18.50")
+
+	if !contains(pom.Content, "<!--<lombok.version>1.18.30</lombok.version>-->") {
+		t.Fatalf("commented property should stay untouched: %s", pom.Content)
+	}
+	liveCount := strings.Count(pom.Content, "<lombok.version>1.18.50</lombok.version>")
+	if liveCount != 2 {
+		t.Fatalf("expected 2 upgraded live properties, got %d in: %s", liveCount, pom.Content)
+	}
+	if contains(pom.Content, "<lombok.version>1.18.42</lombok.version>") {
+		t.Fatalf("old live property values should be gone: %s", pom.Content)
 	}
 }
 
