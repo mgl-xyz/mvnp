@@ -131,7 +131,7 @@ scoops:
       name: mvnp
 
 # Winget manifests are generated into dist/ only until WINGET_GITHUB_TOKEN + a winget-pkgs fork are configured.
-wingets:
+winget:
   - name: mvnp
     ids:
       - default
