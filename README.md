@@ -9,14 +9,52 @@ This repository provides two Go dependency upgrade tools:
 
 ## Installation
 
+### Prebuilt binaries (Windows / macOS / Linux)
+
+Download `mvnp` + `nvnp` archives from [GitHub Releases](https://github.com/mgl-xyz/mvnp/releases).
+
+### Homebrew
+
+```bash
+brew tap mgl-xyz/mvnp https://github.com/mgl-xyz/mvnp
+brew install --cask mvnp
+brew install --cask nvnp
+```
+
+### Scoop
+
+```bash
+scoop bucket add mvnp https://github.com/mgl-xyz/mvnp
+scoop install mvnp/mvnp
+scoop install mvnp/nvnp
+```
+
+### From source
+
 Requires Go 1.21+.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/mgl-xyz/mvnp.git
 cd mvnp
 go build -o mvnp .
-go build -o nvnp ./nvnp
+go build -o nvnp/nvnp ./nvnp
 ```
+
+```bash
+go install .
+go install ./nvnp
+```
+
+### Publishing a release (maintainers)
+
+Push a version tag, or run the **Release** workflow manually with a version such as `v1.0.0`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions builds Windows / macOS / Linux (`amd64` + `arm64`), uploads GitHub Release assets, and updates Homebrew Casks / Scoop manifests in this repository. Winget manifests are generated in CI (`skip_upload`); enable auto-PR to `winget-pkgs` later with a PAT + fork if desired.
 
 ---
 
@@ -32,12 +70,6 @@ Enhanced Maven tooling.
 - **Auto-backup** before every upgrade (enabled by default)
 - Policies aligned with [Maven Versions Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/)
 - Query versions from Maven Central (custom repository URL supported)
-
-## mvnp install
-
-```bash
-go install .
-```
 
 ## mvnp Quick Start
 
@@ -339,7 +371,7 @@ After upgrading, run `npm install` (or pnpm/yarn) to refresh lock files and `nod
 ```bash
 go test ./...
 go build -o mvnp .
-go build -o nvnp ./nvnp
+go build -o nvnp/nvnp ./nvnp
 ```
 
 ## Roadmap

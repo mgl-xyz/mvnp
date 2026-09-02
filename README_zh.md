@@ -9,14 +9,52 @@
 
 ## 安装
 
+### 预编译二进制（Windows / macOS / Linux）
+
+从 [GitHub Releases](https://github.com/mgl-xyz/mvnp/releases) 下载包含 `mvnp` 与 `nvnp` 的压缩包。
+
+### Homebrew
+
+```bash
+brew tap mgl-xyz/mvnp https://github.com/mgl-xyz/mvnp
+brew install --cask mvnp
+brew install --cask nvnp
+```
+
+### Scoop
+
+```bash
+scoop bucket add mvnp https://github.com/mgl-xyz/mvnp
+scoop install mvnp/mvnp
+scoop install mvnp/nvnp
+```
+
+### 从源码编译
+
 需要 Go 1.21 及以上版本。
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/mgl-xyz/mvnp.git
 cd mvnp
 go build -o mvnp .
-go build -o nvnp ./nvnp
+go build -o nvnp/nvnp ./nvnp
 ```
+
+```bash
+go install .
+go install ./nvnp
+```
+
+### 发布新版本（维护者）
+
+推送版本 tag，或在 Actions 中手动运行 **Release** 工作流并填写如 `v1.0.0`：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions 会交叉编译 Windows / macOS / Linux（`amd64` + `arm64`），上传 Release 产物，并回写本仓库的 Homebrew Cask / Scoop 清单。Winget 清单仅在 CI 中生成（`skip_upload`）；若要自动向 `winget-pkgs` 提 PR，需后续配置 PAT 与 fork。
 
 ---
 
@@ -32,12 +70,6 @@ Maven 增强工具。
 - **自动备份**：每次升级前默认自动备份
 - 升级策略与 [Maven Versions Plugin](https://www.mojohaus.org/versions/versions-maven-plugin/) 对齐
 - 从 Maven Central 查询版本（支持自定义仓库地址）
-
-## mvnp 安装
-
-```bash
-go install .
-```
 
 ## mvnp 快速开始
 
@@ -351,7 +383,7 @@ nvnp settings show
 ```bash
 go test ./...
 go build -o mvnp .
-go build -o nvnp ./nvnp
+go build -o nvnp/nvnp ./nvnp
 ```
 
 ## 路线图

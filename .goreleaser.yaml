@@ -1,0 +1,167 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: mvnp
+
+builds:
+  - id: mvnp
+    main: .
+    binary: mvnp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: nvnp
+    main: ./nvnp
+    binary: nvnp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: default
+    ids:
+      - mvnp
+      - nvnp
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: mgl-xyz
+    name: mvnp
+  name_template: "v{{ .Version }}"
+  draft: false
+  prerelease: auto
+
+# Homebrew Casks committed back into this same repository (no separate tap, no extra token).
+homebrew_casks:
+  - name: mvnp
+    ids:
+      - default
+    binaries:
+      - mvnp
+    directory: Casks
+    homepage: https://github.com/mgl-xyz/mvnp
+    description: Safely upgrade Maven pom.xml dependencies with versioned backup/restore
+    repository:
+      owner: mgl-xyz
+      name: mvnp
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mvnp"]
+          end
+
+  - name: nvnp
+    ids:
+      - default
+    binaries:
+      - nvnp
+    directory: Casks
+    homepage: https://github.com/mgl-xyz/mvnp
+    description: Safely upgrade npm package.json dependencies with versioned backup/restore
+    repository:
+      owner: mgl-xyz
+      name: mvnp
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/nvnp"]
+          end
+
+# Scoop manifests in this same repository.
+scoops:
+  - name: mvnp
+    ids:
+      - default
+    directory: scoop
+    homepage: https://github.com/mgl-xyz/mvnp
+    description: Safely upgrade Maven pom.xml dependencies with versioned backup/restore
+    license: MIT
+    repository:
+      owner: mgl-xyz
+      name: mvnp
+
+  - name: nvnp
+    ids:
+      - default
+    directory: scoop
+    homepage: https://github.com/mgl-xyz/mvnp
+    description: Safely upgrade npm package.json dependencies with versioned backup/restore
+    license: MIT
+    repository:
+      owner: mgl-xyz
+      name: mvnp
+
+# Winget manifests are generated into dist/ only until WINGET_GITHUB_TOKEN + a winget-pkgs fork are configured.
+wingets:
+  - name: mvnp
+    ids:
+      - default
+    publisher: mgl-xyz
+    publisher_url: https://github.com/mgl-xyz
+    publisher_support_url: https://github.com/mgl-xyz/mvnp/issues
+    package_identifier: mgl-xyz.mvnp
+    short_description: Safely upgrade Maven pom.xml dependencies with versioned backup/restore
+    license: MIT
+    license_url: https://github.com/mgl-xyz/mvnp/blob/main/LICENSE
+    homepage: https://github.com/mgl-xyz/mvnp
+    skip_upload: true
+    tags:
+      - maven
+      - cli
+      - golang
+
+  - name: nvnp
+    ids:
+      - default
+    publisher: mgl-xyz
+    publisher_url: https://github.com/mgl-xyz
+    publisher_support_url: https://github.com/mgl-xyz/mvnp/issues
+    package_identifier: mgl-xyz.nvnp
+    short_description: Safely upgrade npm package.json dependencies with versioned backup/restore
+    license: MIT
+    license_url: https://github.com/mgl-xyz/mvnp/blob/main/LICENSE
+    homepage: https://github.com/mgl-xyz/mvnp
+    skip_upload: true
+    tags:
+      - npm
+      - cli
+      - golang
