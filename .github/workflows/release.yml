@@ -19,11 +19,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tag:
-    if: github.event_name == 'workflow_dispatch'
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
       - name: Validate version
+        if: github.event_name == 'workflow_dispatch'
         env:
           VERSION: ${{ inputs.version }}
         run: |
@@ -37,7 +37,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # GITHUB_TOKEN tag pushes do not trigger other workflows, so create the
+      # tag here and run GoReleaser in the same job for workflow_dispatch.
       - name: Create and push tag
+        if: github.event_name == 'workflow_dispatch'
         env:
           VERSION: ${{ inputs.version }}
         run: |
@@ -49,15 +52,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$VERSION" -m "Release $VERSION"
           git push origin "$VERSION"
-
-  goreleaser:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v7

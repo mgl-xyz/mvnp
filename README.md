@@ -45,17 +45,6 @@ go install .
 go install ./nvnp
 ```
 
-### Publishing a release (maintainers)
-
-Push a version tag, or run the **Release** workflow manually with a version such as `v1.0.0`:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-GitHub Actions builds Windows / macOS / Linux (`amd64` + `arm64`), uploads GitHub Release assets, and updates Homebrew Casks / Scoop manifests in this repository. Winget manifests are generated in CI (`skip_upload`); enable auto-PR to `winget-pkgs` later with a PAT + fork if desired.
-
 ---
 
 # mvnp

@@ -45,17 +45,6 @@ go install .
 go install ./nvnp
 ```
 
-### 发布新版本（维护者）
-
-推送版本 tag，或在 Actions 中手动运行 **Release** 工作流并填写如 `v1.0.0`：
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-GitHub Actions 会交叉编译 Windows / macOS / Linux（`amd64` + `arm64`），上传 Release 产物，并回写本仓库的 Homebrew Cask / Scoop 清单。Winget 清单仅在 CI 中生成（`skip_upload`）；若要自动向 `winget-pkgs` 提 PR，需后续配置 PAT 与 fork。
-
 ---
 
 # mvnp
