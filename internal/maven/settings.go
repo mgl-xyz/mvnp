@@ -65,7 +65,7 @@ type SettingsOverrides struct {
 }
 
 func DefaultSettings() Settings {
-	autoBackup := true
+	autoBackup := false
 	keepCount := DefaultBackupKeepCount
 	return Settings{
 		Repository:       defaultRepository,
