@@ -1,0 +1,24 @@
+{
+    "version": "1.0.2",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/mgl-xyz/mvnp/releases/download/v1.0.2/mvnp_1.0.2_windows_amd64.zip",
+            "bin": [
+                "nvnp.exe",
+                "mvnp.exe"
+            ],
+            "hash": "c6959f97d2218ae8e7c8fcecd4dfbd709dede0734973e8e5f74781f905c9d3cd"
+        },
+        "arm64": {
+            "url": "https://github.com/mgl-xyz/mvnp/releases/download/v1.0.2/mvnp_1.0.2_windows_arm64.zip",
+            "bin": [
+                "mvnp.exe",
+                "nvnp.exe"
+            ],
+            "hash": "c94ec569963616c0d4b3093b28741a6da6ccd0972e41e3e62f25b9e5d608d972"
+        }
+    },
+    "homepage": "https://github.com/mgl-xyz/mvnp",
+    "license": "MIT",
+    "description": "Safely upgrade npm package.json dependencies with versioned backup/restore"
+}
